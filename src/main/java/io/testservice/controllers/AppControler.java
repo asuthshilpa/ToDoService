@@ -1,46 +1,88 @@
 package io.testservice.controllers;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
+import javax.validation.Valid;
+import javax.validation.constraints.Size;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import io.testservice.model.Questions;
-import io.testservice.model.ReqQuestion;
-import io.testservice.service.PollsService;
+import io.testservice.exception.ItemNotFoundException;
+import io.testservice.model.BalanceTestResult;
+import io.testservice.model.ToDoItem;
+import io.testservice.model.ToDoPatchReq;
+import io.testservice.model.ToDoReq;
+import io.testservice.service.ToDoItemService;
+import io.testservice.utility.AGUtil;
 
 @RestController
+@Validated
 public class AppControler {
 
 	@Autowired
-	PollsService service;
+	ToDoItemService service;
 
-	@RequestMapping(value = "/questions", method = RequestMethod.GET, produces = "application/json")
+	@RequestMapping(value = "/todo", method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
 	@ResponseBody
-	public List<Questions> getQuestions() {
+	public ResponseEntity<Object> ToDoItemAddRequest(@Valid @RequestBody(required=true) ToDoReq request) throws Exception {
 
-		return service.getAllQuestions();
+		return new ResponseEntity<Object>(service.addToDoItem(request.getText()), HttpStatus.CREATED);
 
 	}
 
-	@RequestMapping(value = "/questions", method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
+	@RequestMapping(value = {"/todo/{id}", "/todo/"}, method = RequestMethod.GET, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<Questions> createQuestion(@RequestBody ReqQuestion reqQuest) throws URISyntaxException {
-		int id = service.addQuestion(reqQuest); // adds a new entry to DB and returns ID
-		URI location = new URI("/questions/" + id);
-		HttpHeaders responseHeaders = new HttpHeaders();
-		responseHeaders.setLocation(location);
+	public ResponseEntity<Object> getToDo(@PathVariable(name="id",required=true) int id) throws Exception {
 
-		return new ResponseEntity<Questions>(service.getQuestionAtId(id), responseHeaders, HttpStatus.CREATED);
+		ToDoItem toDoItem = service.getItemAtId(id);
+		if (toDoItem != null) {
+
+			return new ResponseEntity<Object>(toDoItem, HttpStatus.OK);
+		} else {
+
+			throw new ItemNotFoundException("Item with " + id + " not found");
+
+		}
+
+	}
+
+	@RequestMapping(value = {"/todo/{id}", "/todo/"}, method = RequestMethod.PATCH, produces = "application/json", consumes = "application/json")
+	@ResponseBody
+	public ResponseEntity<Object> updateToDo(@PathVariable(name="id",required=true)  int id, @Valid @RequestBody(required=true) ToDoPatchReq request)
+			throws Exception {
+
+		ToDoItem toDoItem = service.getItemAtId(id);
+		if (toDoItem != null) {
+
+			toDoItem = service.updateToDoAtId(id, request);
+
+			return new ResponseEntity<Object>(toDoItem, HttpStatus.OK);
+		} else {
+
+			throw new ItemNotFoundException("Item with " + id + " not found");
+
+		}
+
+	}
+
+	@RequestMapping(value = "/tasks/validateBrackets", method = RequestMethod.GET, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<Object> validateBrackets(
+			@RequestParam(required = true) @Size(max = 100, min = 1) String input) throws Exception {
+
+		AGUtil util = new AGUtil();
+		boolean flag = util.isBalanced(input);
+
+		BalanceTestResult result = new BalanceTestResult(input, flag);
+		return new ResponseEntity<Object>(result, HttpStatus.OK);
 
 	}
 
